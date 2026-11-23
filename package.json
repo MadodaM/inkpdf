@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.4",
+    "lucide-react": "^1.69.0",
+    "tailwindcss": "^4.3.4"
+  },
+  "devDependencies": {
+    "oxlint": "^1.91.0"
+  }
+}
