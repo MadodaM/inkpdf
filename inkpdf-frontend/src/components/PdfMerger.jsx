@@ -3,7 +3,7 @@ import { Files, Trash2, Download, Plus, CheckCircle2 } from 'lucide-react';
 import { mergePDFs } from '../utils/pdfengine';
 import { trackPdfOperation } from '../utils/usageTracker'; // <-- 1. ADD THIS IMPORT
 
-export default function PdfMerger() {
+export default function PdfMerger({ onOperationComplete, onQuotaExceeded }) {
   const [files, setFiles] = useState([]);
   const [merging, setMerging] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -45,10 +45,14 @@ export default function PdfMerger() {
       URL.revokeObjectURL(url);
 
       setSuccess(true);
+      onOperationComplete?.();
     } catch (err) {
       console.error('Merge error:', err);
-      // Displays HTTP 429 quota alert or fallback error message
-      alert(err.message || 'Failed to merge PDF files.');
+      if (err?.isQuotaExceeded) {
+        onQuotaExceeded?.();
+      } else {
+        alert(err.message || 'Failed to merge PDF files.');
+      }
     } finally {
       setMerging(false);
     }

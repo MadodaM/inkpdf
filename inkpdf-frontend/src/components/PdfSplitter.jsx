@@ -9,7 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-export default function PdfSplitter() {
+export default function PdfSplitter({ onOperationComplete, onQuotaExceeded }) {
   const [pdfBytes, setPdfBytes] = useState(null);
   const [fileName, setFileName] = useState('');
   const [totalPages, setTotalPages] = useState(0);
@@ -90,10 +90,14 @@ export default function PdfSplitter() {
       }
 
       setSuccess(true);
+      onOperationComplete?.();
     } catch (err) {
       console.error('Split error:', err);
-      // Displays HTTP 429 quota alert or fallback error message
-      alert(err.message || 'Failed to split/extract PDF pages.');
+      if (err?.isQuotaExceeded) {
+        onQuotaExceeded?.();
+      } else {
+        alert(err.message || 'Failed to split/extract PDF pages.');
+      }
     } finally {
       setProcessing(false);
     }

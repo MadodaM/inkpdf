@@ -9,7 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url
 ).toString();
 
-export default function PdfViewer() {
+export default function PdfViewer({ onOperationComplete, onQuotaExceeded }) {
   const [pdfBytes, setPdfBytes] = useState(null);
   const [pdfDoc, setPdfDoc] = useState(null);
   const [pageNum, setPageNum] = useState(1);
@@ -54,10 +54,14 @@ export default function PdfViewer() {
       setPdfBytes(modifiedBytes);
       const loadedPdf = await pdfjsLib.getDocument({ data: modifiedBytes }).promise;
       setPdfDoc(loadedPdf);
+      onOperationComplete?.();
     } catch (err) {
       console.error('Rotation error:', err);
-      // Displays HTTP 429 quota alert or fallback error message
-      alert(err.message || 'Failed to rotate PDF page.');
+      if (err?.isQuotaExceeded) {
+        onQuotaExceeded?.();
+      } else {
+        alert(err.message || 'Failed to rotate PDF page.');
+      }
     }
   };
 

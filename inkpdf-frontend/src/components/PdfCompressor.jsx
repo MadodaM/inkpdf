@@ -3,7 +3,7 @@ import { Upload, Minimize2, FileText, Download, CheckCircle2, Sliders } from 'lu
 import { compressPDF } from '../utils/pdfengine';
 import { trackPdfOperation } from '../utils/usageTracker'; // <-- 1. ADD THIS IMPORT
 
-export default function PdfCompressor() {
+export default function PdfCompressor({ onOperationComplete, onQuotaExceeded }) {
   const [pdfFile, setPdfFile] = useState(null);
   const [pdfBytes, setPdfBytes] = useState(null);
   const [fileName, setFileName] = useState('');
@@ -52,10 +52,14 @@ export default function PdfCompressor() {
       URL.revokeObjectURL(url);
 
       setSuccess(true);
+      onOperationComplete?.();
     } catch (err) {
       console.error('Compression error:', err);
-      // Displays HTTP 429 quota alert or fallback error message
-      alert(err.message || 'Failed to compress PDF.');
+      if (err?.isQuotaExceeded) {
+        onQuotaExceeded?.();
+      } else {
+        alert(err.message || 'Failed to compress PDF.');
+      }
     } finally {
       setCompressing(false);
     }

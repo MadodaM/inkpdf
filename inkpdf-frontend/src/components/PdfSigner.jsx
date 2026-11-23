@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Upload, PenTool, Eraser, Download, CheckCircle2, FileText } from 'lucide-react';
 import { signPDF } from '../utils/pdfengine';
+import { trackPdfOperation } from '../utils/usageTracker';
 
-export default function PdfSigner() {
+export default function PdfSigner({ onOperationComplete, onQuotaExceeded }) {
   const [pdfFile, setPdfFile] = useState(null);
   const [pdfBytes, setPdfBytes] = useState(null);
   const [fileName, setFileName] = useState('');
@@ -61,6 +62,8 @@ export default function PdfSigner() {
     setSuccess(false);
 
     try {
+      await trackPdfOperation('sign');
+
       const canvas = sigCanvasRef.current;
       const dataUrl = canvas.toDataURL('image/png');
       const res = await fetch(dataUrl);
@@ -82,9 +85,14 @@ export default function PdfSigner() {
       URL.revokeObjectURL(url);
 
       setSuccess(true);
+      onOperationComplete?.();
     } catch (err) {
       console.error('Signing error:', err);
-      alert('Failed to apply signature to PDF.');
+      if (err?.isQuotaExceeded) {
+        onQuotaExceeded?.();
+      } else {
+        alert(err.message || 'Failed to apply signature to PDF.');
+      }
     } finally {
       setSigning(false);
     }
