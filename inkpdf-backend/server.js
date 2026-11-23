@@ -9,20 +9,58 @@ import { sendPaymentReceiptEmail, sendPopiaErasureCertificate } from './emailSer
 
 dotenv.config();
 
+// --- PRODUCTION ENV VALIDATION ---
+const requiredEnv = ['DATABASE_URL', 'JWT_SECRET'];
+for (const key of requiredEnv) {
+  if (!process.env[key] || !process.env[key].trim()) {
+    console.error(`FATAL: Missing required environment variable ${key}`);
+    process.exit(1);
+  }
+}
+
+if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be at least 32 characters in production');
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+app.set('trust proxy', 1);
 
 // Walletdoc Configuration
 const WALLETDOC_API_URL = process.env.NODE_ENV === 'production' 
   ? 'https://www.walletdoc.com/v1/payments' 
   : 'https://sandbox.walletdoc.com/v1/payments';
 
-// Middleware Setup
-app.use(cors());
-app.use(express.json());
+// --- CORS CONFIGURATION FOR inkpdf.co ---
+const defaultOrigins =
+  process.env.NODE_ENV === 'production'
+    ? ['https://inkpdf.co', 'https://www.inkpdf.co']
+    : ['https://inkpdf.co', 'https://www.inkpdf.co', 'http://localhost:5173', 'http://localhost:3000'];
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+  : defaultOrigins;
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+app.use(express.json({ limit: '1mb' }));
 
 /**
- * JWT Authentication Middleware
+- JWT Authentication Middleware
  */
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -38,8 +76,8 @@ function authenticateToken(req, res, next) {
 }
 
 /**
- * Express Middleware: Enforces 24-hour daily operation limits for Free-tier users.
- * Allows Pro subscribers unlimited operations.
+- Express Middleware: Enforces 24-hour daily operation limits for Free-tier users.
+- Allows Pro subscribers unlimited operations.
  */
 async function checkUsageLimit(req, res, next) {
   try {
@@ -89,7 +127,7 @@ async function checkUsageLimit(req, res, next) {
 }
 
 /**
- * Database Migrations
+- Database Migrations
  */
 async function runMigrations() {
   const queryText = `
@@ -134,6 +172,7 @@ app.get('/api/health', async (req, res) => {
     const dbResult = await pool.query('SELECT NOW()');
     res.json({
       status: 'success',
+      domain: 'inkpdf.co',
       message: 'InkPDF API is running with Walletdoc ZAR gateway and Quota Tracking',
       timestamp: dbResult.rows[0].now,
     });
@@ -203,8 +242,8 @@ app.post('/api/auth/login', async (req, res) => {
 // --- USAGE TRACKING & QUOTA ROUTES ---
 
 /**
- * POST /api/usage/log
- * Checks daily limit and records a successful WASM action.
+- POST /api/usage/log
+- Checks daily limit and records a successful WASM action.
  */
 app.post('/api/usage/log', authenticateToken, checkUsageLimit, async (req, res) => {
   const { actionType } = req.body; // 'edit', 'merge', 'sign', 'split', 'compress'
@@ -233,8 +272,8 @@ app.post('/api/usage/log', authenticateToken, checkUsageLimit, async (req, res) 
 });
 
 /**
- * GET /api/usage/status
- * Fetches current 24-hour quota status for UI rendering.
+- GET /api/usage/status
+- Fetches current 24-hour quota status for UI rendering.
  */
 app.get('/api/usage/status', authenticateToken, async (req, res) => {
   try {
@@ -294,14 +333,21 @@ app.post('/api/create-checkout-session', authenticateToken, async (req, res) => 
     const userRes = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
     const email = userRes.rows[0]?.email;
 
+    const appOrigin =
+      process.env.NODE_ENV === 'production'
+        ? 'https://inkpdf.co'
+        : (req.headers.origin && allowedOrigins.includes(req.headers.origin)
+            ? req.headers.origin
+            : 'https://inkpdf.co');
+
     const payload = {
       merchantId: process.env.WALLETDOC_MERCHANT_ID,
       amount: 15000, // R150.00 expressed in cents
       currency: 'ZAR',
       reference: `INKPDF-PRO-${userId}-${Date.now()}`,
       description: 'InkPDF Pro Monthly Subscription',
-      successUrl: `${req.headers.origin || 'http://localhost:5173'}/?payment=success`,
-      cancelUrl: `${req.headers.origin || 'http://localhost:5173'}/?payment=cancelled`,
+      successUrl: `${appOrigin}/?payment=success`,
+      cancelUrl: `${appOrigin}/?payment=cancelled`,
       customer: { email }
     };
 
@@ -415,11 +461,40 @@ app.delete('/api/account', authenticateToken, async (req, res) => {
   }
 });
 
+// --- GLOBAL ERROR HANDLER ---
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+  if (err?.message?.startsWith('CORS blocked')) {
+    return res.status(403).json({ error: 'Origin not allowed' });
+  }
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+  });
+});
+
+let server;
+
 async function startServer() {
   await runMigrations();
-  app.listen(PORT, () => {
-    console.log(`InkPDF backend server running on http://localhost:${PORT} with Walletdoc and Quota Enforcement`);
+  server = app.listen(PORT, () => {
+    console.log(`InkPDF backend server running on port ${PORT} for inkpdf.co`);
   });
 }
+
+function shutdown(signal) {
+  console.log(`Received ${signal}. Closing InkPDF backend cleanly...`);
+  if (server) {
+    server.close(async () => {
+      await pool.end();
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 startServer();
