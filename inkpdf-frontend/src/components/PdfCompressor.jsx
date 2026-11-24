@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, Minimize2, FileText, Download, CheckCircle2, Sliders } from 'lucide-react';
-import { compressPDF } from '../utils/pdfengine';
+import { compressPDF } from '../utils/pdfEngine';
 import { trackPdfOperation } from '../utils/usageTracker'; // <-- 1. ADD THIS IMPORT
 
 export default function PdfCompressor({ onOperationComplete, onQuotaExceeded }) {

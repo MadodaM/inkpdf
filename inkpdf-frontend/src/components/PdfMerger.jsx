@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Files, Trash2, Download, Plus, CheckCircle2 } from 'lucide-react';
-import { mergePDFs } from '../utils/pdfengine';
+import { mergePDFs } from '../utils/pdfEngine';
 import { trackPdfOperation } from '../utils/usageTracker'; // <-- 1. ADD THIS IMPORT
 
 export default function PdfMerger({ onOperationComplete, onQuotaExceeded }) {

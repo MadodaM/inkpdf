@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, Scissors, FileText, Download, CheckCircle2 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { extractPages } from '../utils/pdfengine';
+import { extractPages } from '../utils/pdfEngine';
 import { trackPdfOperation } from '../utils/usageTracker'; // <-- 1. ADD THIS IMPORT
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
