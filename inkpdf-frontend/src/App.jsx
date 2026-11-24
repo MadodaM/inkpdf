@@ -6,19 +6,33 @@ import PdfSigner from './components/PdfSigner';
 import PdfSplitter from './components/PdfSplitter';
 import PdfCompressor from './components/PdfCompressor';
 import PrivacyModal from './components/PrivacyModal';
-import UpgradeModal from './components/UpgradeModal'; // <-- 1. IMPORT UPGRADE MODAL
+import UpgradeModal from './components/UpgradeModal';
 import AccountSettings from './components/AccountSettings';
 import BillingPortal from './components/BillingPortal';
 import ProGate from './components/ProGate';
 import AdBanner from './components/AdBanner';
+import LegalPage from './components/LegalPage'; // <-- 3a. IMPORT LEGAL PAGE
+import Footer from './components/Footer';       // <-- 3b. IMPORT FOOTER
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+const PATH_TO_TAB = {
+  '/terms': 'terms',
+  '/privacy': 'privacy',
+  '/refunds': 'refunds',
+};
+
+const TAB_TO_PATH = {
+  terms: '/terms',
+  privacy: '/privacy',
+  refunds: '/refunds',
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('viewer');
+  const [activeTab, setActiveTab] = useState(() => PATH_TO_TAB[window.location.pathname] || 'viewer');
   const [isPro, setIsPro] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false); // <-- 2a. UPGRADE MODAL STATE
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // 1. Track daily 24-hour quota status for the header badge
   const [quota, setQuota] = useState({
@@ -27,6 +41,23 @@ export default function App() {
     dailyLimit: 3,
     remaining: 3,
   });
+
+  // 3c. SYNC TAB WITH URL PATH & BROWSER BACK/FORWARD
+  const navigateTab = useCallback((nextTab) => {
+    setActiveTab(nextTab);
+    const targetPath = TAB_TO_PATH[nextTab] || '/';
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTab(PATH_TO_TAB[window.location.pathname] || 'viewer');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const refreshQuota = useCallback(async () => {
     const token = localStorage.getItem('inkpdf_token');
@@ -98,20 +129,24 @@ export default function App() {
     setShowUpgradeModal(true);
   };
 
+  const isLegalTab = activeTab === 'terms' || activeTab === 'privacy' || activeTab === 'refunds';
+
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 flex flex-col items-center justify-center p-6 relative">
       <PrivacyModal />
 
-      {/* 3. RENDER UPGRADE MODAL */}
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        onGoToBilling={() => setActiveTab('billing')}
+        onGoToBilling={() => navigateTab('billing')}
         usedToday={quota.usedToday}
         dailyLimit={quota.dailyLimit}
       />
 
-      {!user ? (
+      {/* 3d. RENDER LEGAL PAGE DIRECTLY IF ON /terms, /privacy, OR /refunds */}
+      {isLegalTab ? (
+        <LegalPage docType={activeTab} onBack={() => navigateTab('viewer')} />
+      ) : !user ? (
         <AuthForm onLoginSuccess={(userData) => { setUser(userData); checkProStatus(); }} />
       ) : (
         <div className="w-full max-w-4xl space-y-6">
@@ -124,7 +159,7 @@ export default function App() {
               </span>
               <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 overflow-x-auto">
                 <button
-                  onClick={() => setActiveTab('viewer')}
+                  onClick={() => navigateTab('viewer')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'viewer' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -132,7 +167,7 @@ export default function App() {
                   View & Edit
                 </button>
                 <button
-                  onClick={() => setActiveTab('merger')}
+                  onClick={() => navigateTab('merger')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'merger' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -140,7 +175,7 @@ export default function App() {
                   Merge (Pro)
                 </button>
                 <button
-                  onClick={() => setActiveTab('signer')}
+                  onClick={() => navigateTab('signer')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'signer' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -148,7 +183,7 @@ export default function App() {
                   Sign
                 </button>
                 <button
-                  onClick={() => setActiveTab('splitter')}
+                  onClick={() => navigateTab('splitter')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'splitter' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -156,7 +191,7 @@ export default function App() {
                   Split (Pro)
                 </button>
                 <button
-                  onClick={() => setActiveTab('compressor')}
+                  onClick={() => navigateTab('compressor')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'compressor' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -164,7 +199,7 @@ export default function App() {
                   Compress (Pro)
                 </button>
                 <button
-                  onClick={() => setActiveTab('billing')}
+                  onClick={() => navigateTab('billing')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'billing' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -172,7 +207,7 @@ export default function App() {
                   Billing
                 </button>
                 <button
-                  onClick={() => setActiveTab('settings')}
+                  onClick={() => navigateTab('settings')}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
                     activeTab === 'settings' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -254,6 +289,9 @@ export default function App() {
           {activeTab === 'settings' && <AccountSettings user={user} onAccountDeleted={() => { handleLogout(); }} />}
         </div>
       )}
+
+      {/* 3e. RENDER FOOTER AT BOTTOM OF PAGE */}
+      <Footer onNavigateLegal={(docType) => navigateTab(docType)} />
     </div>
   );
 }
