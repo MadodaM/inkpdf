@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Upload, FileText, RotateCw } from 'lucide-react';
-import { rotatePage } from '../utils/pdfengine';
+import { rotatePage } from '../utils/pdfEngine';
 import { trackPdfOperation } from '../utils/usageTracker'; // <-- 1. ADD THIS IMPORT
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
