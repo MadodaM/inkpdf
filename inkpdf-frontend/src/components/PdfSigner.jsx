@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, PenTool, Eraser, Download, CheckCircle2, FileText } from 'lucide-react';
-import { signPDF } from '../utils/pdfengine';
+import { signPDF } from '../utils/pdfEngine';
 import { trackPdfOperation } from '../utils/usageTracker';
 
 export default function PdfSigner({ onOperationComplete, onQuotaExceeded }) {
